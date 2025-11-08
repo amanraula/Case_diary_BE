@@ -5,56 +5,104 @@ const Officer = require('../models/officer.model');
 // Create new case
 exports.createCase = asyncHandler(async (req, res) => {
   const { caseNum, description, stationReported, status } = req.body;
-  if (!caseNum || !description || !stationReported) {
+  const officer = req.officer;
+
+  // 🧠 1️⃣ Basic validation
+  if (!caseNum || !description) {
     res.status(400);
-    throw new Error('caseNum, description, and stationReported are required');
+    throw new Error("caseNum and description are required");
   }
 
-  const exists = await Case.findOne({ caseNum:id });
+  // 🧠 2️⃣ Check for duplicates
+  const exists = await Case.findOne({ caseNum });
   if (exists) {
     res.status(400);
-    throw new Error('caseNum already exists');
+    throw new Error("caseNum already exists");
   }
 
-  const officer = req.officer;
-  const c = await Case.create({
+  // 🧠 3️⃣ Auto-fill from officer if missing
+  const caseData = {
     caseNum,
     description,
-    stationReported,
-    status,
-    reportedByBadge: officer.badgeNumber,
-    reportedByRank: officer.rank,
-    reportedById: officer._id
-  });
+    stationReported: stationReported || officer.station || "Unknown Station",
+    status: status || "pending",
+    reportedByBadge: officer.badgeNumber || "N/A",
+    reportedByRank: officer.rank || "N/A",
+    reportedById: officer._id || null,
+  };
 
-  res.status(201).json(c);
+  // 🧠 4️⃣ Create & save
+  const newCase = await Case.create(caseData);
+
+  res.status(201).json({
+    message: "Case created successfully",
+    case: newCase,
+  });
 });
+// PATCH /api/cases/:caseNum
+exports.updateCaseStatus = async (req, res) => {
+  try {
+    const caseNum = decodeURIComponent(req.params.caseNum); // important if slashes encoded
+    const { status } = req.body;
+
+    if (!['pending', 'completed', 'aborted'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+
+    const c = await Case.findOne({ caseNum }); // ✅ instead of findById
+    if (!c) {
+      return res.status(404).json({ message: 'Case not found' });
+    }
+
+    c.status = status;
+    c.updates.push({
+      dateTime: new Date(),
+      description: `Status changed to ${status}`,
+      updatedBy: req.officer?.badgeNumber || 'system',
+    });
+
+    await c.save();
+
+    return res.status(200).json({
+      message: `Status updated to ${status}`,
+      case: c,
+    });
+  } catch (err) {
+    console.error('Error updating case status:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 
 // List cases (rank-based visibility)
 exports.listCases = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
   const officer = req.officer;
   const myRankLevel = officer.rankLevel;
+  const myStation = officer.station;
 
-  // officers with lower or equal rankLevel
-  const lowerRankOfficers = await Officer.find({
-    rankLevel: { $gte: myRankLevel }
-  }).select('_id');
+  // ✅ Officers of lower or equal rank
+  const allowedOfficers = await Officer.find({
+    rankLevel: { $gte: myRankLevel },
+    station: myStation
+  }).select("_id");
 
-  const ids = lowerRankOfficers.map(o => o._id);
-  const query = { reportedById: { $in: ids } };
+  const officerIds = allowedOfficers.map(o => o._id);
 
-  const skip = (Math.max(1, parseInt(page)) - 1) * Math.max(1, parseInt(limit));
-  const [cases, total] = await Promise.all([
-    Case.find(query).sort({ lastUpdateDate: -1 }).skip(skip).limit(parseInt(limit)),
-    Case.countDocuments(query)
-  ]);
+  // ✅ Only cases from same station and filed by allowed officers
+  const cases = await Case.find({
+    stationReported: myStation,
+    reportedById: { $in: officerIds },
+  })
+    .sort({ lastUpdateDate: -1 })
+    .lean();
 
   res.json({
-    meta: { total, page: parseInt(page), limit: parseInt(limit), pages: Math.ceil(total / limit) },
-    data: cases
+    success: true,
+    total: cases.length,
+    data: cases,
   });
 });
+
 
 // Get single case
 exports.getCase = asyncHandler(async (req, res) => {

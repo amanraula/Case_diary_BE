@@ -1,4 +1,5 @@
 const express = require('express');
+const { updateCaseStatus } = require('../controllers/case.controller');
 const router = express.Router();
 const {
   createCase,
@@ -18,10 +19,10 @@ router.use(protect);
 router.route('/')
   .get(listCases)
   .post(createCase);
-  
+
 router.get('/recommend/:caseNum', listRecommendations);
 router.post('/:id/updates', addCaseUpdate);
-
+router.patch('/:caseNum', protect, updateCaseStatus);
 router.route('/:id')
   .get(getCase)
   .patch(updateCase)
