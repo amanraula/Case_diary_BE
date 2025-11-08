@@ -12,7 +12,16 @@ const CaseSchema = new mongoose.Schema({
   lastUpdateDate: { type: Date, default: Date.now },
   reportedByBadge: { type: String },
   reportedByRank: { type: String },
-  reportedById: { type: mongoose.Schema.Types.ObjectId, ref: 'Officer' }
+  reportedById: { type: mongoose.Schema.Types.ObjectId, ref: 'Officer' },
+
+  // 🆕 updates log array
+  updates: [
+    {
+      dateTime: { type: Date, default: Date.now },
+      description: { type: String, required: true },
+      updatedBy: { type: String, required: true }
+    }
+  ]
 }, { timestamps: true });
 
 CaseSchema.pre('save', function(next) {

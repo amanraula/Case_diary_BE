@@ -6,7 +6,8 @@ const {
   updateCase,
   deleteCase,
   listCases,
-  listRecommendations   // 👈 new
+  listRecommendations,   // 👈 new
+  addCaseUpdate  // ✅ new
 } = require('../controllers/case.controller');
 
 
@@ -19,6 +20,7 @@ router.route('/')
   .post(createCase);
   
 router.get('/recommend/:caseNum', listRecommendations);
+router.post('/:id/updates', addCaseUpdate);
 
 router.route('/:id')
   .get(getCase)

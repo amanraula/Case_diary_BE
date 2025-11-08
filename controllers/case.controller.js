@@ -10,7 +10,7 @@ exports.createCase = asyncHandler(async (req, res) => {
     throw new Error('caseNum, description, and stationReported are required');
   }
 
-  const exists = await Case.findOne({ caseNum });
+  const exists = await Case.findOne({ caseNum:id });
   if (exists) {
     res.status(400);
     throw new Error('caseNum already exists');
@@ -58,13 +58,18 @@ exports.listCases = asyncHandler(async (req, res) => {
 
 // Get single case
 exports.getCase = asyncHandler(async (req, res) => {
-  const c = await Case.findById(req.params.id);
+  const { id } = req.params;
+
+  // find case by caseNum (case-insensitive)
+  const c = await Case.findOne({ caseNum: new RegExp(`^${id}$`, 'i') });
   if (!c) {
     res.status(404);
     throw new Error('Case not found');
   }
-  res.json(c);
+
+  res.status(200).json(c);
 });
+
 
 // Update case
 exports.updateCase = asyncHandler(async (req, res) => {
@@ -139,5 +144,39 @@ exports.listRecommendations = asyncHandler(async (req, res) => {
       solved: solved.slice(0, 5),   // limit to top 5
       pending: pending.slice(0, 5)
     }
+  });
+});
+// 🧾 Add update entry to a case
+exports.addCaseUpdate = asyncHandler(async (req, res) => {
+  const { id } = req.params; // case ID
+  const { description } = req.body;
+
+  if (!description) {
+    res.status(400);
+    throw new Error('Update description is required');
+  }
+
+  const officer = req.officer;
+  const c = await Case.findOne({ caseNum: id });
+if (!c) {
+  res.status(404);
+  throw new Error('Case not found');
+}
+
+
+  // Add new update entry
+  const newUpdate = {
+    dateTime: new Date(),
+    description,
+    updatedBy: officer.badgeNumber
+  };
+
+  c.updates.push(newUpdate);
+  c.lastUpdateDate = new Date();
+  await c.save();
+
+  res.status(201).json({
+    message: 'Update added successfully',
+    updates: c.updates
   });
 });
