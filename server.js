@@ -19,6 +19,7 @@ connectDB(process.env.MONGO_URI);
 app.use('/api/auth', authRoutes);
 app.use('/api/cases', caseRoutes);
 app.use("/api/2fa", require("./routes/2fa.routes"));
+app.use('/api/schedules', require('./routes/schedule.routes'));
 
 // simple health endpoint
 app.get('/', (req, res) => res.send('Digital Crime Diary API running'));
