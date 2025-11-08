@@ -153,21 +153,22 @@ exports.deleteCase = asyncHandler(async (req, res) => {
 // 🔍 Recommendation System: find similar cases
 exports.listRecommendations = asyncHandler(async (req, res) => {
   const { caseNum } = req.params;
+  const officer = req.officer;
 
-  // 1️⃣ find the reference case
+  // 1️⃣ Find the reference case
   const refCase = await Case.findOne({ caseNum });
   if (!refCase) {
     res.status(404);
     throw new Error('Case not found');
   }
 
-  // 2️⃣ basic keyword extraction from description
+  // 2️⃣ Extract basic keywords
   const keywords = refCase.description
     .toLowerCase()
     .split(/\W+/)
     .filter(word => word.length > 3);
 
-  // 3️⃣ search for cases that have similar words or same station
+  // 3️⃣ Fetch potentially similar cases
   const similarCases = await Case.find({
     _id: { $ne: refCase._id },
     $or: [
@@ -176,24 +177,27 @@ exports.listRecommendations = asyncHandler(async (req, res) => {
     ]
   });
 
-  // 4️⃣ separate solved vs pending
-  const solved = similarCases.filter(c => c.status === 'completed');
-  const pending = similarCases.filter(c => c.status === 'pending');
+  // 4️⃣ Apply visibility rules
+  const publicCases = similarCases.filter(c => c.status === 'completed');
+  const privateCases = similarCases.filter(
+    c => c.status === 'pending' && c.stationReported === officer.station
+  );
 
-  // 5️⃣ prepare output
+  // 5️⃣ Combine & return neatly
   res.json({
-    case: {
+    reference: {
       caseNum: refCase.caseNum,
       description: refCase.description,
       stationReported: refCase.stationReported,
-      status: refCase.status
+      status: refCase.status,
     },
     recommendations: {
-      solved: solved.slice(0, 5),   // limit to top 5
-      pending: pending.slice(0, 5)
-    }
+      public: publicCases.slice(0, 10),
+      private: privateCases.slice(0, 10),
+    },
   });
 });
+
 // 🧾 Add update entry to a case
 exports.addCaseUpdate = asyncHandler(async (req, res) => {
   const { id } = req.params; // case ID
