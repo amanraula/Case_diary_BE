@@ -1,12 +1,16 @@
-import mongoose from "mongoose";
-import { ENV_VARS } from "./envVars.js";
+const mongoose = require('mongoose');
 
-export const connectDB = async () => {
-	try {
-		const conn = await mongoose.connect(ENV_VARS.MONGO_URI);
-		console.log("MongoDB connected: " + conn.connection.host);
-	} catch (error) {
-		console.error("Error connecting to MONGODB: " + error.message);
-		process.exit(1); // 1 means there was an error, 0 means success
-	}
+const connectDB = async (mongoUri) => {
+  try {
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
+    console.log('MongoDB connected');
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+    process.exit(1);
+  }
 };
+
+module.exports = connectDB;
