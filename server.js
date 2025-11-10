@@ -31,6 +31,9 @@ app.use('/api/schedules', require('./routes/schedule.routes'));
 
 // simple health endpoint
 app.get('/', (req, res) => res.send('Digital Crime Diary API running'));
+app.get("/healthop", (req, res) => {
+  res.status(200).send("OK");
+});
 
 // error handler should be last
 app.use(errorHandler);
