@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = require("path");  // ✅ THIS IS THE FIX
+
 require('dotenv').config();
 const express = require('express');
 const morgan = require('morgan');
@@ -7,11 +10,16 @@ const authRoutes = require('./routes/auth.routes');
 const caseRoutes = require('./routes/case.routes');
 const errorHandler = require('./middleware/error.middleware');
 
+
 const app = express();
 app.use(express.json());
 app.use(cors());
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
+const uploadsRoot = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
 
+// serve uploaded files
+app.use('/uploads', express.static(uploadsRoot));
 // Connect DB
 connectDB(process.env.MONGO_URI);
 

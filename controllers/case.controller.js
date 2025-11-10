@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = require("path");  // ✅ THIS IS THE FIX
+
 const asyncHandler = require('express-async-handler');
 const Case = require('../models/case.model');
 const Officer = require('../models/officer.model');
@@ -232,3 +235,151 @@ if (!c) {
     updates: c.updates
   });
 });
+// POST /api/cases/:caseNum/upload
+exports.uploadCaseFiles = asyncHandler(async (req, res) => {
+  const { caseNum } = req.params;
+  const officer = req.officer;
+
+  const c = await Case.findOne({ caseNum });
+  if (!c) {
+    // cleanup uploaded files if any
+    if (req.files) {
+      req.files.forEach(f => {
+        try { fs.unlinkSync(f.path); } catch(e) {}
+      });
+    }
+    res.status(404);
+    throw new Error('Case not found');
+  }
+
+  if (!req.files || !req.files.length) {
+    res.status(400);
+    throw new Error('No files uploaded');
+  }
+
+  req.files.forEach(f => {
+    const meta = {
+      filename: path.basename(f.path),
+      originalName: f.originalname,
+      mimetype: f.mimetype,
+      size: f.size,
+      uploadedBy: officer.badgeNumber || officer.name,
+      uploadedAt: new Date()
+    };
+    c.files.push(meta);
+    c.updates.push({
+      dateTime: new Date(),
+      description: `File uploaded: ${f.originalname}`,
+      updatedBy: officer.badgeNumber || officer.name
+    });
+  });
+
+  c.lastUpdateDate = new Date();
+  await c.save();
+
+  res.status(201).json({ message: 'Files uploaded', files: c.files, updates: c.updates });
+});
+
+// DELETE /api/cases/:caseNum/files/:fileId
+exports.deleteCaseFile = asyncHandler(async (req, res) => {
+  const { caseNum, fileId } = req.params;
+  const officer = req.officer;
+
+  const c = await Case.findOne({ caseNum });
+  if (!c) {
+    res.status(404);
+    throw new Error('Case not found');
+  }
+
+  // find file by subdocument _id (Mongoose assigns _id to subdocs by default)
+  const fileIndex = c.files.findIndex(f => String(f._id) === String(fileId));
+  if (fileIndex === -1) {
+    res.status(404);
+    throw new Error('File not found on case');
+  }
+
+  const fileMeta = c.files[fileIndex];
+  const filePath = path.join(__dirname, '..', 'uploads', 'cases', caseNum, fileMeta.filename);
+
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.error('Failed to delete file from disk', err);
+  }
+
+  c.files.splice(fileIndex, 1);
+  c.updates.push({
+    dateTime: new Date(),
+    description: `File deleted: ${fileMeta.originalName || fileMeta.filename}`,
+    updatedBy: officer.badgeNumber || officer.name,
+  });
+
+  c.lastUpdateDate = new Date();
+  await c.save();
+
+  res.json({ message: 'File deleted', updates: c.updates });
+});
+
+// GET /api/cases/:caseNum/files
+exports.getCaseFiles = asyncHandler(async (req, res) => {
+  const caseNum = decodeURIComponent(req.params.caseNum);
+  const c = await Case.findOne({ caseNum }).lean();
+  if (!c) {
+    return res.status(404).json({ message: 'Case not found' });
+  }
+
+  // ensure files array exists
+  const files = Array.isArray(c.files) ? c.files : [];
+
+  // If you want to expose direct download URL, add it here:
+  const base = process.env.BASE_URL || "http://localhost:5000";
+
+const filesWithUrl = files.map(f => ({
+  ...f,
+  url: `${base}/uploads/cases/${encodeURIComponent(caseNum)}/${encodeURIComponent(f.filename)}`
+}));
+res.json({ files: filesWithUrl });
+
+
+  return res.json({ files: filesWithUrl });
+});
+
+exports.uploadFilesHandler = async (req, res) => {
+  try {
+    const { caseNum } = req.params;
+    const officer = req.officer;
+
+    const c = await Case.findOne({ caseNum });
+    if (!c) return res.status(404).json({ message: "Case not found" });
+
+    if (!req.files || req.files.length === 0)
+      return res.status(400).json({ message: "No files uploaded" });
+
+    req.files.forEach((file) => {
+      c.files.push({
+        filename: file.filename,
+        originalName: file.originalname,
+        size: file.size,
+        uploadedAt: new Date(),
+        uploadedBy: officer.badgeNumber,
+      });
+
+      c.updates.push({
+        dateTime: new Date(),
+        description: `📁 File uploaded: ${file.originalname}`,
+        updatedBy: officer.badgeNumber,
+      });
+    });
+
+    await c.save();
+
+    res.json({
+      message: "Files uploaded",
+      files: c.files,
+      updates: c.updates,
+    });
+  } catch (err) {
+    console.error("Error uploading files:", err);
+    res.status(500).json({ message: err.message });
+  }
+};

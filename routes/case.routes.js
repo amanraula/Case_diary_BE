@@ -1,28 +1,49 @@
 const express = require('express');
-const { updateCaseStatus } = require('../controllers/case.controller');
 const router = express.Router();
+const { protect } = require('../middleware/auth.middleware');
+const upload = require('../middleware/upload.middleware'); // ✅ this exports multer
 const {
   createCase,
   getCase,
   updateCase,
   deleteCase,
   listCases,
-  listRecommendations,   // 👈 new
-  addCaseUpdate  // ✅ new
+  getCaseFiles,
+  listRecommendations,
+  addCaseUpdate,
+  uploadFilesHandler,   // ✅ import it properly
+  deleteCaseFile,
+  updateCaseStatus
 } = require('../controllers/case.controller');
 
-
-const { protect } = require('../middleware/auth.middleware');
-
+// all routes below require auth
 router.use(protect);
 
-router.route('/')
-  .get(listCases)
-  .post(createCase);
+// Create case
+router.post('/', createCase);
 
-router.get('/recommend/:caseNum', listRecommendations);
+// List cases
+router.get('/', listCases);
+
+// Upload files to existing case
+router.post('/:caseNum/upload', upload.array('files'), uploadFilesHandler);
+
+// Delete file from case
+// router.delete('/:caseNum/files/:filename', deleteCaseFile);
+router.delete('/:caseNum/files/:fileId', deleteCaseFile);
+
+
+// Add update
 router.post('/:id/updates', addCaseUpdate);
-router.patch('/:caseNum', protect, updateCaseStatus);
+
+// Recommend
+router.get('/recommend/:caseNum', listRecommendations);
+
+// Update status
+router.patch('/:caseNum', updateCaseStatus);
+router.get('/:caseNum/files', getCaseFiles);
+
+// Get, edit, delete case
 router.route('/:id')
   .get(getCase)
   .patch(updateCase)

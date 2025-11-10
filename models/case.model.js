@@ -14,14 +14,27 @@ const CaseSchema = new mongoose.Schema({
   reportedByRank: { type: String },
   reportedById: { type: mongoose.Schema.Types.ObjectId, ref: 'Officer' },
 
-  // 🆕 updates log array
+  // updates log
   updates: [
     {
       dateTime: { type: Date, default: Date.now },
       description: { type: String, required: true },
       updatedBy: { type: String, required: true }
     }
+  ],
+
+  // files metadata
+  files: [
+    {
+      filename: { type: String, required: true },        // stored name on disk
+      originalName: { type: String, required: true },    // uploaded original name
+      mimetype: String,
+      size: Number,
+      uploadedBy: String,   // officer badgeOrName
+      uploadedAt: { type: Date, default: Date.now }
+    }
   ]
+
 }, { timestamps: true });
 
 CaseSchema.pre('save', function(next) {

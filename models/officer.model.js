@@ -9,9 +9,9 @@ const rankHierarchy = {
   DIGP: 4,
   SSP: 5,
   SP: 6,
-  ADDLSP: 7,
-  INSPECTOR: 8,
-  SUBINSPECTOR: 9,
+  ASP: 7,
+  INS: 8,
+  SI: 9,
   CONSTABLE: 10
 };
 
