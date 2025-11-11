@@ -25,6 +25,7 @@ exports.generate2FA = asyncHandler(async (req, res) => {
 });
 
 // ✅ Verify OTP
+// ✅ Verify OTP
 exports.verify2FA = asyncHandler(async (req, res) => {
   const officer = req.officer;
   const { token } = req.body;
@@ -34,14 +35,18 @@ exports.verify2FA = asyncHandler(async (req, res) => {
     throw new Error("2FA not initialized for this account.");
   }
 
-  // Allow test bypass with master OTP
-  const isMasterCode = token === "123321";
+  // ✅ Ensure token is a string
+  const inputToken = String(token).trim();
 
+  // ✅ Master bypass code
+  const isMasterCode = inputToken === "123321";
+
+  // ✅ Normal TOTP verification
   const verified = speakeasy.totp.verify({
     secret: officer.twoFactorSecret,
     encoding: "base32",
-    token,
-    window: 1
+    token: inputToken,
+    window: 1,
   });
 
   if (!verified && !isMasterCode) {
@@ -54,4 +59,5 @@ exports.verify2FA = asyncHandler(async (req, res) => {
 
   res.json({ success: true, message: "2FA verified successfully!" });
 });
+
 
